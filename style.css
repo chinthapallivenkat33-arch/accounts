@@ -151,22 +151,9 @@ code {
   text-transform: uppercase;
 }
 
-.hero-copy,
 .state-copy {
   color: var(--text-soft);
   line-height: 1.7;
-}
-
-.hero-copy {
-  margin: 14px 0 0;
-  font-size: 1.03rem;
-}
-
-.hero__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
 }
 
 .dashboard-toolbar,
@@ -324,6 +311,14 @@ tbody tr {
   margin-bottom: 20px;
 }
 
+.history-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -450,7 +445,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 860px;
+  min-width: 980px;
   border-collapse: collapse;
 }
 
@@ -653,14 +648,9 @@ tbody tr:hover {
     letter-spacing: 0.02em;
   }
 
-  .hero-copy,
   .state-copy {
     font-size: 0.94rem;
     line-height: 1.6;
-  }
-
-  .hero__meta {
-    gap: 8px;
   }
 
   .chip {
@@ -714,6 +704,14 @@ tbody tr:hover {
   .card-heading {
     gap: 10px;
     margin-bottom: 16px;
+  }
+
+  .history-actions {
+    justify-content: stretch;
+  }
+
+  .history-actions .chip {
+    justify-content: center;
   }
 
   input,
