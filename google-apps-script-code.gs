@@ -2,7 +2,7 @@ const SPREADSHEET_ID = "PASTE_YOUR_GOOGLE_SHEET_ID_HERE";
 const SHEET_NAME = "Transactions";
 const DRIVE_FOLDER_ID = "";
 
-const HEADERS = ["Type", "Name", "Amount", "Account", "Date", "LogTime", "Screenshot"];
+const HEADERS = ["Type", "Name", "Amount", "Account", "Date", "LogTime", "Screenshot", "CurrentBalance"];
 
 function doGet() {
   const sheet = getTransactionSheet();
@@ -19,7 +19,8 @@ function doGet() {
     Account: row[3],
     Date: formatSheetDate(row[4]),
     LogTime: formatSheetDateTime(row[5]),
-    Screenshot: row[6]
+    Screenshot: row[6],
+    CurrentBalance: row[7]
   }));
 
   return jsonResponse(rows);
@@ -30,15 +31,21 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents || "{}");
     const sheet = getTransactionSheet();
     const screenshotUrl = saveScreenshotFile(payload.ScreenshotFile);
+    const type = String(payload.Type || "").trim().toUpperCase();
+    const account = String(payload.Account || "").trim().toUpperCase();
+    const amount = Number(payload.Amount || 0);
+    const currentBalance = getCurrentBalanceForAccount(sheet, account) +
+      (type === "RECEIVED" ? amount : -amount);
 
     const row = [
-      String(payload.Type || "").trim().toUpperCase(),
+      type,
       String(payload.Name || "").trim(),
-      Number(payload.Amount || 0),
-      String(payload.Account || "").trim().toUpperCase(),
+      amount,
+      account,
       String(payload.Date || "").trim(),
       String(payload.LogTime || new Date().toISOString()).trim(),
-      screenshotUrl
+      screenshotUrl,
+      currentBalance
     ];
 
     validateTransactionRow(row);
@@ -54,6 +61,34 @@ function doPost(e) {
       message: error.message || "Unable to save transaction record."
     });
   }
+}
+
+function getCurrentBalanceForAccount(sheet, account) {
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) {
+    return 0;
+  }
+
+  return values.slice(1).reduce((balance, row) => {
+    const rowType = String(row[0] || "").trim().toUpperCase();
+    const rowAmount = Number(row[2] || 0);
+    const rowAccount = String(row[3] || "").trim().toUpperCase();
+
+    if (rowAccount !== account || !Number.isFinite(rowAmount)) {
+      return balance;
+    }
+
+    if (rowType === "RECEIVED") {
+      return balance + rowAmount;
+    }
+
+    if (rowType === "SENT") {
+      return balance - rowAmount;
+    }
+
+    return balance;
+  }, 0);
 }
 
 function saveScreenshotFile(fileData) {
