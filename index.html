@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accounts Management System</title>
+  <meta
+    name="description"
+    content="A static accounts management system for AXIS and KVB transactions using Google Sheets through Google Apps Script."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero__content">
+        <p class="eyebrow">Accounts Management System</p>
+        <h1>
+          <span class="hero-highlight">DAWOOD IBRAHIM</span>
+          <span class="hero-subtitle">Accounts Management System</span>
+        </h1>
+        <p class="hero-copy">
+          Manage AXIS and KVB account transactions with balance summaries, transaction entry,
+          filtered records, and Google Apps Script API integration.
+        </p>
+        <div class="hero__meta">
+          <span class="chip chip--soft">Google Sheets API</span>
+          <span class="chip chip--soft">Transaction Records</span>
+          <span class="chip chip--soft">Account Balances</span>
+          <span class="chip chip--soft">Static Frontend</span>
+        </div>
+      </div>
+
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
+        <span id="themeToggleIcon" class="theme-toggle__icon" aria-hidden="true">D</span>
+        <span id="themeToggleLabel">Dark mode</span>
+      </button>
+    </header>
+
+    <section class="dashboard-toolbar" aria-label="Dashboard controls">
+      <div>
+        <p class="section-kicker">Live Ledger</p>
+        <h2>Account Operations Console</h2>
+      </div>
+      <button id="refreshButton" class="secondary-button" type="button">Refresh records</button>
+    </section>
+
+    <section class="stats-grid" aria-label="Account summary">
+      <article class="stat-card stat-card--axis">
+        <p>AXIS Balance</p>
+        <h2 id="axisBalance">Rs 0.00</h2>
+        <span class="stat-note">Received - Sent</span>
+      </article>
+
+      <article class="stat-card stat-card--kvb">
+        <p>KVB Balance</p>
+        <h2 id="kvbBalance">Rs 0.00</h2>
+        <span class="stat-note">Received - Sent</span>
+      </article>
+
+      <article class="stat-card stat-card--sent">
+        <p>Total Sent</p>
+        <h2 id="totalSent">Rs 0.00</h2>
+        <span class="stat-note">Across all accounts</span>
+      </article>
+
+      <article class="stat-card stat-card--received">
+        <p>Total Received</p>
+        <h2 id="totalReceived">Rs 0.00</h2>
+        <span class="stat-note">Across all accounts</span>
+      </article>
+    </section>
+
+    <main class="content-grid">
+      <section class="card form-card">
+        <div class="card-heading">
+          <div>
+            <p class="section-kicker">Transaction Entry</p>
+            <h3>Add Transaction Record</h3>
+          </div>
+          <span class="chip">POST API</span>
+        </div>
+
+        <form id="transactionForm" class="transaction-form" novalidate>
+          <label>
+            <span>Type</span>
+            <select id="type" name="type" required>
+              <option value="">Select type</option>
+              <option value="SENT">SENT</option>
+              <option value="RECEIVED">RECEIVED</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Particulars</span>
+            <input id="name" name="name" type="text" placeholder="Transaction party or reference" maxlength="80" required>
+          </label>
+
+          <label>
+            <span>Amount</span>
+            <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+          </label>
+
+          <label>
+            <span>Account</span>
+            <select id="account" name="account" required>
+              <option value="">Select account</option>
+              <option value="AXIS">AXIS</option>
+              <option value="KVB">KVB</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Transaction Date</span>
+            <input id="date" name="date" type="date" required>
+          </label>
+
+          <label>
+            <span>Upload Screenshot</span>
+            <input id="screenshot" name="screenshot" type="file" accept="image/*,.pdf">
+          </label>
+
+          <div class="form-actions">
+            <button id="submitButton" class="primary-button" type="submit">Save record</button>
+            <button id="resetFiltersButton" class="ghost-button" type="button">Clear filters</button>
+          </div>
+
+          <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="card filters-card">
+        <div class="card-heading">
+          <div>
+            <p class="section-kicker">Record Filters</p>
+            <h3>Filter Transaction Records</h3>
+          </div>
+          <span id="recordCount" class="chip">0 records</span>
+        </div>
+
+        <div class="filters-grid">
+          <label>
+            <span>Type</span>
+            <select id="filterType">
+              <option value="ALL">All</option>
+              <option value="SENT">SENT</option>
+              <option value="RECEIVED">RECEIVED</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Account</span>
+            <select id="filterAccount">
+              <option value="ALL">All</option>
+              <option value="AXIS">AXIS</option>
+              <option value="KVB">KVB</option>
+            </select>
+          </label>
+
+          <label>
+            <span>From Date</span>
+            <input id="filterFromDate" type="date">
+          </label>
+
+          <label>
+            <span>To Date</span>
+            <input id="filterToDate" type="date">
+          </label>
+
+          <label class="filters-grid__search">
+            <span>Search By Particulars</span>
+            <input id="searchName" type="search" placeholder="Type a party or reference">
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <section class="card history-card">
+      <div class="card-heading card-heading--history">
+        <div>
+          <p class="section-kicker">Transaction Ledger</p>
+          <h3>All Transaction Records</h3>
+        </div>
+        <span class="chip">GET API</span>
+      </div>
+
+      <div id="loadingState" class="state-box" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading transaction records from Google Sheets...</p>
+      </div>
+
+      <div id="errorState" class="state-box state-box--error" hidden>
+        <p id="errorText">Unable to load transaction records.</p>
+      </div>
+
+      <div id="emptyState" class="state-box state-box--empty" hidden>
+        <div class="empty-illustration" aria-hidden="true"></div>
+        <p class="state-title">No transaction records found</p>
+        <p class="state-copy">
+          Add a transaction record or adjust the filters to view matching ledger entries.
+        </p>
+      </div>
+
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Particulars</th>
+              <th>Amount</th>
+              <th>Account</th>
+              <th>Transaction Date</th>
+              <th>LogTime</th>
+              <th>Screenshot</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
