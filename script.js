@@ -26,6 +26,7 @@ const elements = {
   formMessage: document.getElementById("formMessage"),
   axisBalance: document.getElementById("axisBalance"),
   kvbBalance: document.getElementById("kvbBalance"),
+  totalBalance: document.getElementById("totalBalance"),
   totalSent: document.getElementById("totalSent"),
   totalReceived: document.getElementById("totalReceived"),
   historyBody: document.getElementById("historyBody"),
@@ -275,8 +276,11 @@ const addCurrentBalances = (transactions) => {
 
 const renderSummary = () => {
   const summary = calculateSummary(state.transactions);
+  const totalBalance = summary.axisBalance + summary.kvbBalance;
+
   elements.axisBalance.textContent = formatCurrency(summary.axisBalance);
   elements.kvbBalance.textContent = formatCurrency(summary.kvbBalance);
+  elements.totalBalance.textContent = formatCurrency(totalBalance);
   elements.totalSent.textContent = formatCurrency(summary.totalSent);
   elements.totalReceived.textContent = formatCurrency(summary.totalReceived);
 };
@@ -418,7 +422,10 @@ const renderIosExportFallback = (exportWindow, csvContent, fileName) => {
     return false;
   }
 
-  const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
+  const csvBlob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8"
+  });
+  const csvUrl = URL.createObjectURL(csvBlob);
 
   exportWindow.document.open();
   exportWindow.document.write(`
@@ -475,7 +482,7 @@ const renderIosExportFallback = (exportWindow, csvContent, fileName) => {
       <body>
         <h1>Export Ready</h1>
         <p>Tap the button below. On iPhone, choose Files, Numbers, Google Sheets, or Share to save/open the CSV.</p>
-        <a href="${dataUrl}" download="${escapeHtml(fileName)}">Download CSV</a>
+        <a href="${csvUrl}" download="${escapeHtml(fileName)}">Download CSV</a>
         <textarea readonly>${escapeHtml(csvContent)}</textarea>
       </body>
     </html>
@@ -485,14 +492,9 @@ const renderIosExportFallback = (exportWindow, csvContent, fileName) => {
 };
 
 const exportFilteredTransactions = async () => {
-  const iosExportWindow = isIosDevice() ? window.open("", "_blank") : null;
   const rows = getExportRows();
 
   if (!rows.length) {
-    if (iosExportWindow) {
-      iosExportWindow.close();
-    }
-
     setErrorState("No filtered transaction records available to export.");
     return;
   }
@@ -510,32 +512,41 @@ const exportFilteredTransactions = async () => {
     type: "text/csv;charset=utf-8"
   });
 
+  if (isIosDevice()) {
+    const exportWindow = window.open("", "_blank");
+
+    if (renderIosExportFallback(exportWindow, csvContent, fileName)) {
+      return;
+    }
+
+    setErrorState("Unable to open export page. Please allow pop-ups for this site and try again.");
+    return;
+  }
+
   if (navigator.canShare && navigator.share) {
     const file = new File([blob], fileName, { type: "text/csv" });
 
-    if (navigator.canShare({ files: [file] })) {
+    let canShareFile = false;
+
+    try {
+      canShareFile = navigator.canShare({ files: [file] });
+    } catch (error) {
+      canShareFile = false;
+    }
+
+    if (canShareFile) {
       try {
         await navigator.share({
           files: [file],
           title: "Filtered transaction records"
         });
-        if (iosExportWindow) {
-          iosExportWindow.close();
-        }
         return;
       } catch (error) {
         if (error.name === "AbortError") {
-          if (iosExportWindow) {
-            iosExportWindow.close();
-          }
           return;
         }
       }
     }
-  }
-
-  if (renderIosExportFallback(iosExportWindow, csvContent, fileName)) {
-    return;
   }
 
   downloadBlob(blob, fileName);
