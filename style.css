@@ -244,7 +244,7 @@ tbody tr {
 }
 
 .stats-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 22px;
 }
 
@@ -292,6 +292,10 @@ tbody tr {
 
 .stat-card--kvb {
   background: linear-gradient(135deg, rgba(11, 155, 117, 0.18), var(--surface));
+}
+
+.stat-card--total-balance {
+  background: linear-gradient(135deg, rgba(255, 189, 89, 0.18), var(--surface));
 }
 
 .stat-card--sent {
