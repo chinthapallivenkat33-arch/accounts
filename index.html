@@ -22,16 +22,6 @@
           <span class="hero-highlight">DAWOOD IBRAHIM</span>
           <span class="hero-subtitle">Accounts Management System</span>
         </h1>
-        <p class="hero-copy">
-          Manage AXIS and KVB account transactions with balance summaries, transaction entry,
-          filtered records, and Google Apps Script API integration.
-        </p>
-        <div class="hero__meta">
-          <span class="chip chip--soft">Google Sheets API</span>
-          <span class="chip chip--soft">Transaction Records</span>
-          <span class="chip chip--soft">Account Balances</span>
-          <span class="chip chip--soft">Static Frontend</span>
-        </div>
       </div>
 
       <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
@@ -184,7 +174,10 @@
           <p class="section-kicker">Transaction Ledger</p>
           <h3>All Transaction Records</h3>
         </div>
-        <span class="chip">GET API</span>
+        <div class="history-actions">
+          <button id="exportButton" class="secondary-button" type="button">Export filtered Excel</button>
+          <span class="chip">GET API</span>
+        </div>
       </div>
 
       <div id="loadingState" class="state-box" hidden>
@@ -212,6 +205,7 @@
               <th>Particulars</th>
               <th>Amount</th>
               <th>Account</th>
+              <th>Current Balance</th>
               <th>Transaction Date</th>
               <th>LogTime</th>
               <th>Screenshot</th>
