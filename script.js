@@ -21,6 +21,7 @@ const elements = {
   transactionForm: document.getElementById("transactionForm"),
   submitButton: document.getElementById("submitButton"),
   refreshButton: document.getElementById("refreshButton"),
+  exportButton: document.getElementById("exportButton"),
   resetFiltersButton: document.getElementById("resetFiltersButton"),
   formMessage: document.getElementById("formMessage"),
   axisBalance: document.getElementById("axisBalance"),
@@ -97,6 +98,7 @@ const setLoading = (isLoading) => {
   elements.loadingState.hidden = !isLoading;
   elements.refreshButton.disabled = isLoading;
   elements.submitButton.disabled = isLoading;
+  elements.exportButton.disabled = isLoading;
 };
 
 const setFormMessage = (message, type = "") => {
@@ -229,6 +231,48 @@ const calculateSummary = (transactions) => {
   return summary;
 };
 
+const getTransactionTimestamp = (transaction) => {
+  const parsed = new Date(transaction.logTime || transaction.date || 0).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getSignedAmount = (transaction) => {
+  if (transaction.type === "RECEIVED") {
+    return transaction.amount;
+  }
+
+  if (transaction.type === "SENT") {
+    return -transaction.amount;
+  }
+
+  return 0;
+};
+
+const addCurrentBalances = (transactions) => {
+  const balances = {
+    AXIS: 0,
+    KVB: 0
+  };
+
+  return transactions
+    .map((transaction, index) => ({
+      ...transaction,
+      originalIndex: index
+    }))
+    .sort((left, right) => {
+      const timeDifference = getTransactionTimestamp(left) - getTransactionTimestamp(right);
+      return timeDifference || left.originalIndex - right.originalIndex;
+    })
+    .map((transaction) => {
+      balances[transaction.account] += getSignedAmount(transaction);
+
+      return {
+        ...transaction,
+        currentBalance: balances[transaction.account]
+      };
+    });
+};
+
 const renderSummary = () => {
   const summary = calculateSummary(state.transactions);
   elements.axisBalance.textContent = formatCurrency(summary.axisBalance);
@@ -272,6 +316,7 @@ const renderTable = () => {
       <td data-label="Particulars">${safeName}</td>
       <td data-label="Amount"><span class="amount ${isReceived ? "received" : "sent"}">${formatCurrency(transaction.amount)}</span></td>
       <td data-label="Account">${safeAccount}</td>
+      <td data-label="Current Balance"><span class="amount ${transaction.currentBalance >= 0 ? "received" : "sent"}">${formatCurrency(transaction.currentBalance)}</span></td>
       <td data-label="Transaction Date">${escapeHtml(formatDisplayDate(transaction.date))}</td>
       <td data-label="LogTime">${escapeHtml(formatDateTime(transaction.logTime))}</td>
       <td data-label="Screenshot">${screenshotMarkup}</td>
@@ -331,6 +376,61 @@ const sortTransactions = (transactions) =>
     return rightTime - leftTime;
   });
 
+const getExportRows = () =>
+  state.filteredTransactions.map((transaction) => ({
+    Type: transaction.type,
+    Particulars: transaction.name,
+    Amount: transaction.amount,
+    Account: transaction.account,
+    "Current Balance": transaction.currentBalance,
+    "Transaction Date": formatDisplayDate(transaction.date),
+    LogTime: formatDateTime(transaction.logTime),
+    Screenshot: transaction.screenshot || ""
+  }));
+
+const exportFilteredTransactions = () => {
+  const rows = getExportRows();
+
+  if (!rows.length) {
+    setErrorState("No filtered transaction records available to export.");
+    return;
+  }
+
+  setErrorState("");
+
+  const headers = Object.keys(rows[0]);
+  const tableRows = rows.map((row) => `
+    <tr>
+      ${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join("")}
+    </tr>
+  `).join("");
+  const worksheet = `
+    <html>
+      <head><meta charset="UTF-8"></head>
+      <body>
+        <table>
+          <thead>
+            <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+  const blob = new Blob([worksheet], {
+    type: "application/vnd.ms-excel;charset=utf-8"
+  });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.href = url;
+  link.download = `filtered-transactions-${new Date().toISOString().slice(0, 10)}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
 const parseTransactionsResponse = async (response) => {
   const contentType = response.headers.get("content-type") || "";
 
@@ -378,16 +478,16 @@ const fetchTransactions = async () => {
       ? result
       : result.data || result.transactions || result.records || [];
 
-    state.transactions = sortTransactions(
-      rows
-        .map(normalizeTransaction)
-        .filter((transaction) =>
-          isValidType(transaction.type) &&
-          transaction.name &&
-          Number.isFinite(transaction.amount) &&
-          isValidAccount(transaction.account)
-        )
-    );
+    const validTransactions = rows
+      .map(normalizeTransaction)
+      .filter((transaction) =>
+        isValidType(transaction.type) &&
+        transaction.name &&
+        Number.isFinite(transaction.amount) &&
+        isValidAccount(transaction.account)
+      );
+
+    state.transactions = sortTransactions(addCurrentBalances(validTransactions));
 
     renderSummary();
   } catch (error) {
@@ -487,6 +587,7 @@ const setDefaultTransactionDate = () => {
 const initializeEventListeners = () => {
   elements.transactionForm.addEventListener("submit", submitTransaction);
   elements.refreshButton.addEventListener("click", fetchTransactions);
+  elements.exportButton.addEventListener("click", exportFilteredTransactions);
   elements.resetFiltersButton.addEventListener("click", resetFilters);
 
   elements.themeToggle.addEventListener("click", () => {
