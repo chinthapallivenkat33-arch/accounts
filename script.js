@@ -384,14 +384,17 @@ const getExportRows = () =>
     Account: transaction.account,
     "Current Balance": transaction.currentBalance,
     "Transaction Date": formatDisplayDate(transaction.date),
-    LogTime: formatDateTime(transaction.logTime),
-    Screenshot: transaction.screenshot || ""
+    LogTime: formatDateTime(transaction.logTime)
   }));
 
 const escapeCsvValue = (value) => {
   const text = String(value ?? "");
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
+
+const isIosDevice = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 const downloadBlob = (blob, fileName) => {
   const link = document.createElement("a");
@@ -410,10 +413,86 @@ const downloadBlob = (blob, fileName) => {
   }, 1000);
 };
 
+const renderIosExportFallback = (exportWindow, csvContent, fileName) => {
+  if (!exportWindow) {
+    return false;
+  }
+
+  const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
+
+  exportWindow.document.open();
+  exportWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Export Transactions</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 22px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0a1320;
+            color: #e7eef8;
+          }
+
+          a,
+          button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 48px;
+            margin: 10px 0;
+            border: 0;
+            border-radius: 14px;
+            color: #071018;
+            background: #4be3a2;
+            font: inherit;
+            font-weight: 800;
+            text-decoration: none;
+          }
+
+          textarea {
+            width: 100%;
+            min-height: 240px;
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            color: inherit;
+            font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+          }
+
+          p {
+            color: #96aaca;
+            line-height: 1.5;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Export Ready</h1>
+        <p>Tap the button below. On iPhone, choose Files, Numbers, Google Sheets, or Share to save/open the CSV.</p>
+        <a href="${dataUrl}" download="${escapeHtml(fileName)}">Download CSV</a>
+        <textarea readonly>${escapeHtml(csvContent)}</textarea>
+      </body>
+    </html>
+  `);
+  exportWindow.document.close();
+  return true;
+};
+
 const exportFilteredTransactions = async () => {
+  const iosExportWindow = isIosDevice() ? window.open("", "_blank") : null;
   const rows = getExportRows();
 
   if (!rows.length) {
+    if (iosExportWindow) {
+      iosExportWindow.close();
+    }
+
     setErrorState("No filtered transaction records available to export.");
     return;
   }
@@ -426,7 +505,8 @@ const exportFilteredTransactions = async () => {
     ...rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(","))
   ];
   const fileName = `filtered-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
-  const blob = new Blob([`\uFEFF${csvRows.join("\r\n")}`], {
+  const csvContent = `\uFEFF${csvRows.join("\r\n")}`;
+  const blob = new Blob([csvContent], {
     type: "text/csv;charset=utf-8"
   });
 
@@ -439,13 +519,23 @@ const exportFilteredTransactions = async () => {
           files: [file],
           title: "Filtered transaction records"
         });
+        if (iosExportWindow) {
+          iosExportWindow.close();
+        }
         return;
       } catch (error) {
         if (error.name === "AbortError") {
+          if (iosExportWindow) {
+            iosExportWindow.close();
+          }
           return;
         }
       }
     }
+  }
+
+  if (renderIosExportFallback(iosExportWindow, csvContent, fileName)) {
+    return;
   }
 
   downloadBlob(blob, fileName);
