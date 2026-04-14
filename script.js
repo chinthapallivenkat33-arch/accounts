@@ -388,7 +388,29 @@ const getExportRows = () =>
     Screenshot: transaction.screenshot || ""
   }));
 
-const exportFilteredTransactions = () => {
+const escapeCsvValue = (value) => {
+  const text = String(value ?? "");
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const downloadBlob = (blob, fileName) => {
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.href = url;
+  link.download = fileName;
+  link.target = "_blank";
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
+};
+
+const exportFilteredTransactions = async () => {
   const rows = getExportRows();
 
   if (!rows.length) {
@@ -399,36 +421,34 @@ const exportFilteredTransactions = () => {
   setErrorState("");
 
   const headers = Object.keys(rows[0]);
-  const tableRows = rows.map((row) => `
-    <tr>
-      ${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join("")}
-    </tr>
-  `).join("");
-  const worksheet = `
-    <html>
-      <head><meta charset="UTF-8"></head>
-      <body>
-        <table>
-          <thead>
-            <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </body>
-    </html>
-  `;
-  const blob = new Blob([worksheet], {
-    type: "application/vnd.ms-excel;charset=utf-8"
+  const csvRows = [
+    headers.map(escapeCsvValue).join(","),
+    ...rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(","))
+  ];
+  const fileName = `filtered-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+  const blob = new Blob([`\uFEFF${csvRows.join("\r\n")}`], {
+    type: "text/csv;charset=utf-8"
   });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
 
-  link.href = url;
-  link.download = `filtered-transactions-${new Date().toISOString().slice(0, 10)}.xls`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  if (navigator.canShare && navigator.share) {
+    const file = new File([blob], fileName, { type: "text/csv" });
+
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Filtered transaction records"
+        });
+        return;
+      } catch (error) {
+        if (error.name === "AbortError") {
+          return;
+        }
+      }
+    }
+  }
+
+  downloadBlob(blob, fileName);
 };
 
 const parseTransactionsResponse = async (response) => {
